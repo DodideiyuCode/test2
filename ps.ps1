@@ -1,120 +1,180 @@
 <#
 .SYNOPSIS
-    Script de limpeza do Xeno com animacoes no console.
+    Script de limpeza do Xeno com animacoes avancadas no console.
 .DESCRIPTION
     - Finaliza processos chamados Xeno / XENO / xeno.
     - Remove as pastas C:\Users\benic\AppData\Roaming\Xeno e C:\Users\benic\AppData\Local\Xeno.
     - Limpa todos os logs do Gerenciador de Eventos do Windows.
-    - Exibe animacoes (fade, spinner, barra) para deixar a execucao bonita no CMD.
 .NOTES
     Requer privilegios de Administrador para limpar os logs de eventos.
 #>
 
 #region ---------- FUNCOES DE ANIMACAO ----------
 
+# Efeito typewriter: digita o texto caractere por caractere
+function Write-TypeText {
+    param(
+        [string]$Text,
+        [int]$Speed = 15,
+        [ConsoleColor]$Color = 'White',
+        [switch]$NewLine
+    )
+    foreach ($char in $Text.ToCharArray()) {
+        Write-Host -NoNewline -ForegroundColor $Color $char
+        Start-Sleep -Milliseconds $Speed
+    }
+    if ($NewLine) { Write-Host }
+}
+
+# Efeito fade: transiciona cor do texto em ondas
 function Write-FadeText {
     param(
         [string]$Text,
-        [int]$Delay = 20,
-        [ConsoleColor]$StartColor = 'DarkGray',
-        [ConsoleColor]$EndColor = 'White'
+        [int]$Delay = 40,
+        [ConsoleColor[]]$Colors = @('DarkGray', 'Gray', 'White')
     )
-    $steps = 5
-    for ($s = 1; $s -le $steps; $s++) {
-        $color = if ($s -eq $steps) { $EndColor } else { $StartColor }
-        Write-Host -NoNewline -ForegroundColor $color "`r$Text"
+    foreach ($color in $Colors) {
+        Write-Host -NoNewline "`r$Text" -ForegroundColor $color
         Start-Sleep -Milliseconds $Delay
-        $StartColor = switch ($StartColor) {
-            'DarkGray' { 'Gray' }
-            'Gray'     { 'White' }
-            default    { $EndColor }
-        }
     }
     Write-Host
 }
 
+# Spinner moderno com rotacao fluida e cor pulsante
 function Show-Spinner {
     param(
         [string]$Message,
         [int]$Duration = 1000
     )
-    $spin = @('|', '/', '-', '\')
+    $frames = @([char]0x25DC, [char]0x25DD, [char]0x25DE, [char]0x25DF)
+    # Fallback ASCII se os caracteres unicode nao renderizarem
+    $ascii = @('|', '/', '-', '\')
+    $useAscii = $true
+
     $end = (Get-Date).AddMilliseconds($Duration)
     $i = 0
     while ((Get-Date) -lt $end) {
-        Write-Host -NoNewline -ForegroundColor Cyan "`r$($spin[$i % 4]) $Message"
-        Start-Sleep -Milliseconds 100
+        $frame = if ($useAscii) { $ascii[$i % 4] } else { $frames[$i % 4] }
+        $color = switch ($i % 4) {
+            0 { 'Cyan' }
+            1 { 'DarkCyan' }
+            2 { 'Blue' }
+            3 { 'DarkCyan' }
+        }
+        Write-Host -NoNewline -ForegroundColor $color "`r  $frame  $Message"
+        Start-Sleep -Milliseconds 90
         $i++
     }
-    Write-Host -NoNewline -ForegroundColor Green "`r[OK] $Message"
+    Write-Host -NoNewline -ForegroundColor Green "`r  [OK]  $Message"
     Write-Host
 }
 
-function Show-Bar {
+# Barra de progresso com porcentagem, preenchimento animado e cor dinamica
+function Show-ProgressBar {
     param(
         [string]$Message,
-        [int]$Total = 20,
-        [int]$Delay = 50
+        [int]$Duration = 1500,
+        [int]$Width = 30
     )
-    Write-Host -NoNewline -ForegroundColor Yellow "$Message "
-    for ($i = 1; $i -le $Total; $i++) {
-        Write-Host -NoNewline -ForegroundColor Green '#'
-        Start-Sleep -Milliseconds $Delay
+    $steps = 60
+    $delay = [int]($Duration / $steps)
+    $end = $steps
+    $i = 0
+
+    Write-Host ""
+    Write-Host "  $Message" -ForegroundColor Gray
+    Write-Host -NoNewline "  "
+
+    while ($i -le $end) {
+        $pct = [int](($i / $end) * 100)
+        $filled = [int](($i / $end) * $Width)
+        $empty = $Width - $filled
+
+        # Cor dinamica conforme avanca
+        $color = switch ($pct) {
+            { $_ -lt 30 }  { 'Red' }
+            { $_ -lt 60 }  { 'Yellow' }
+            { $_ -lt 90 }  { 'DarkYellow' }
+            default        { 'Green' }
+        }
+
+        # Monta a barra
+        $bar = ''
+        if ($filled -gt 0) {
+            if ($filled -ge $Width) {
+                $bar = '#' * $Width
+            } else {
+                $bar = ('#' * ($filled - 1)) + '>' + (' ' * $empty)
+            }
+        } else {
+            $bar = '>' + (' ' * ($Width - 1))
+        }
+
+        # Aplica cor apenas no preenchimento
+        $line = "  ["
+        Write-Host -NoNewline -ForegroundColor DarkGray "`r  ["
+        Write-Host -NoNewline -ForegroundColor $color $bar
+        Write-Host -NoNewline -ForegroundColor DarkGray "]  "
+        Write-Host -NoNewline -ForegroundColor White ("{0,3}%" -f $pct)
+
+        Start-Sleep -Milliseconds $delay
+        $i++
     }
-    Write-Host -ForegroundColor Green ' OK'
+
+    Write-Host -NoNewline -ForegroundColor DarkGray "]  "
+    Write-Host -ForegroundColor Green "  OK"
+    Write-Host ""
 }
 
-#endregion
-
-#region ---------- BANNER INICIAL ----------
-
-Clear-Host
-$banner = @"
-  ##    ## ######## ##    ##  #######
-  ##    ## ##       ###   ## ##     ##
-  ######## ######   ####  ## ##     ##
-  ##    ## ##       ## ## ## ##     ##
-  ##    ## ######## ##    ##  #######
-        Limpeza Automatica
-"@
-
-Write-FadeText -Text $banner -Delay 30 -StartColor DarkGray -EndColor Red
-Write-Host ""
+# Cabecalho de secao com efeito fade em ciano
+function Write-Section {
+    param([string]$Title)
+    Write-Host ""
+    Write-FadeText -Text "  >> $Title" -Delay 40 -Colors @('DarkGray', 'DarkCyan', 'Cyan', 'Cyan')
+}
 
 #endregion
 
 #region ---------- VERIFICACAO DE PRIVILEGIOS ----------
 
+Clear-Host
+Write-TypeText -Text "  Inicializando script de limpeza do Xeno..." -Speed 12 -Color DarkCyan -NewLine
+Start-Sleep -Milliseconds 400
+Write-Host ""
+
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 if (-not $isAdmin) {
-    Write-Host "[!] Este script requer privilegios de Administrador para limpar os logs de eventos." -ForegroundColor Yellow
-    Write-Host "    Execute o PowerShell como Administrador e tente novamente." -ForegroundColor Yellow
-    Read-Host "Pressione ENTER para sair"
+    Write-Host ""
+    Write-Host "  [!] Execute o PowerShell como Administrador." -ForegroundColor Yellow
+    Read-Host "      Pressione ENTER para sair"
     exit 1
 }
+Write-Host "  [OK] Privilegios de Administrador confirmados." -ForegroundColor Green
+Start-Sleep -Milliseconds 600
 
 #endregion
 
 #region ---------- ETAPA 1: FINALIZAR PROCESSOS XENO ----------
 
-Write-FadeText -Text "Procurando processos Xeno..." -Delay 25 -StartColor DarkCyan -EndColor Cyan
-Show-Spinner -Message "Escaneando processos" -Duration 800
+Write-Section "Procurando processos Xeno"
+Write-TypeText -Text "      Escaneando lista de processos do sistema..." -Speed 8 -Color Gray -NewLine
+Show-Spinner -Message "Verificando processos ativos" -Duration 1200
 
 $processos = Get-Process -Name Xeno -ErrorAction SilentlyContinue
 if ($processos) {
     foreach ($proc in $processos) {
-        Write-Host "   -> Encontrado: $($proc.Name) (PID: $($proc.Id))" -ForegroundColor Yellow
+        Write-Host "      -> Encontrado: $($proc.Name) (PID: $($proc.Id))" -ForegroundColor Yellow
         try {
             Stop-Process -Id $proc.Id -Force -ErrorAction Stop
-            Write-Host "   [OK] Processo finalizado com sucesso." -ForegroundColor Green
+            Write-Host "      [OK] Processo finalizado." -ForegroundColor Green
         } catch {
-            Write-Host "   [ERRO] Falha ao finalizar: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "      [ERRO] $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 } else {
-    Write-Host "   [OK] Nenhum processo Xeno em execucao." -ForegroundColor Green
+    Write-Host "      [OK] Nenhum processo Xeno em execucao." -ForegroundColor Green
 }
-Start-Sleep -Milliseconds 500
+Start-Sleep -Milliseconds 400
 
 #endregion
 
@@ -125,54 +185,66 @@ $pastas = @(
     "C:\Users\benic\AppData\Local\Xeno"
 )
 
-Write-FadeText -Text "Removendo pastas associadas..." -Delay 25 -StartColor DarkCyan -EndColor Cyan
+Write-Section "Removendo pastas associadas"
+
 foreach ($pasta in $pastas) {
     if (Test-Path -LiteralPath $pasta) {
-        Write-Host "   -> Removendo: $pasta" -ForegroundColor Yellow
+        Write-Host "      -> Removendo: $pasta" -ForegroundColor Yellow
+        Show-ProgressBar -Message "Apagando arquivos..." -Duration 1200 -Width 28
         try {
             Remove-Item -LiteralPath $pasta -Recurse -Force -ErrorAction Stop
-            Write-Host "   [OK] Pasta removida." -ForegroundColor Green
+            Write-Host "      [OK] Pasta removida com sucesso." -ForegroundColor Green
         } catch {
-            Write-Host "   [ERRO] Erro ao remover: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "      [ERRO] $($_.Exception.Message)" -ForegroundColor Red
         }
     } else {
-        Write-Host "   [OK] Pasta nao encontrada (ja limpa): $pasta" -ForegroundColor Gray
+        Write-Host "      [OK] Pasta nao encontrada (ja limpa): $pasta" -ForegroundColor Gray
     }
+    Start-Sleep -Milliseconds 300
 }
-Start-Sleep -Milliseconds 500
 
 #endregion
 
 #region ---------- ETAPA 3: LIMPAR LOGS DE EVENTOS ----------
 
-Write-FadeText -Text "Limpando logs do Gerenciador de Eventos..." -Delay 25 -StartColor DarkCyan -EndColor Cyan
-Show-Bar -Message "Limpando logs" -Total 15 -Delay 60
+Write-Section "Limpando logs do Gerenciador de Eventos"
 
-try {
-    $logs = wevtutil el
-    $total = $logs.Count
-    $i = 0
-    foreach ($log in $logs) {
-        $i++
-        $pct = [int](($i / $total) * 100)
-        $status = "$i de ${total}: $log"
-        Write-Progress -Activity "Limpando logs de eventos" -Status $status -PercentComplete $pct
-        wevtutil cl "$log" 2>$null
-    }
-    Write-Progress -Activity "Limpando logs de eventos" -Completed
-    Write-Host "   [OK] Todos os logs foram limpos." -ForegroundColor Green
-} catch {
-    Write-Host "   [ERRO] Erro ao limpar logs: $($_.Exception.Message)" -ForegroundColor Red
+$logs = wevtutil el
+$total = $logs.Count
+Write-TypeText -Text "      Encontrados $total logs para limpar." -Speed 8 -Color Gray -NewLine
+Start-Sleep -Milliseconds 400
+
+$i = 0
+foreach ($log in $logs) {
+    $i++
+    $pct = [int](($i / $total) * 100)
+    $filled = [int](($pct / 100) * 30)
+    $empty = 30 - $filled
+
+    $color = if ($pct -lt 50) { 'Yellow' } elseif ($pct -lt 90) { 'DarkYellow' } else { 'Green' }
+    $bar = if ($filled -ge 30) { '#' * 30 } else { ('#' * $filled) + (' ' * $empty) }
+
+    Write-Host -NoNewline "`r      ["
+    Write-Host -NoNewline -ForegroundColor $color $bar
+    Write-Host -NoNewline "]  "
+    Write-Host -NoNewline -ForegroundColor White ("{0,3}%" -f $pct)
+
+    wevtutil cl "$log" 2>$null
 }
-Start-Sleep -Milliseconds 500
+Write-Host ""
+Write-Host "      [OK] Todos os logs foram limpos." -ForegroundColor Green
+Start-Sleep -Milliseconds 400
 
 #endregion
 
 #region ---------- FINALIZACAO ----------
 
 Write-Host ""
-Write-FadeText -Text "[OK] Limpeza concluida com sucesso!" -Delay 40 -StartColor DarkGreen -EndColor Green
-Write-Host "Pressione qualquer tecla para sair..." -ForegroundColor DarkGray
+Write-FadeText -Text "  [OK] Limpeza concluida com sucesso!" -Delay 60 -Colors @('DarkGray', 'DarkGreen', 'Green', 'Green', 'Green')
+Start-Sleep -Milliseconds 400
+
+Write-Host ""
+Write-Host "  Pressione qualquer tecla para sair..." -ForegroundColor DarkGray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
 #endregion
