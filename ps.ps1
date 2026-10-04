@@ -5,7 +5,7 @@
     - Finaliza processos chamados Xeno / XENO / xeno.
     - Remove as pastas C:\Users\benic\AppData\Roaming\Xeno e C:\Users\benic\AppData\Local\Xeno.
     - Limpa todos os logs do Gerenciador de Eventos do Windows.
-    - Exibe animacoes (fade, spinner, barras) para tornar a execucao bonita no CMD.
+    - Exibe animacoes (fade, spinner, barra) para deixar a execucao bonita no CMD.
 .NOTES
     Requer privilegios de Administrador para limpar os logs de eventos.
 #>
@@ -79,7 +79,7 @@ $banner = @"
 "@
 
 Write-FadeText -Text $banner -Delay 30 -StartColor DarkGray -EndColor Red
-Write-Host "`n"
+Write-Host ""
 
 #endregion
 
@@ -89,7 +89,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIde
 if (-not $isAdmin) {
     Write-Host "[!] Este script requer privilegios de Administrador para limpar os logs de eventos." -ForegroundColor Yellow
     Write-Host "    Execute o PowerShell como Administrador e tente novamente." -ForegroundColor Yellow
-    Read-Host "`nPressione ENTER para sair"
+    Read-Host "Pressione ENTER para sair"
     exit 1
 }
 
@@ -154,7 +154,9 @@ try {
     $i = 0
     foreach ($log in $logs) {
         $i++
-        Write-Progress -Activity "Limpando logs de eventos" -Status "${i} de ${total}: ${log}" -PercentComplete (($i / $total) * 100)
+        $pct = [int](($i / $total) * 100)
+        $status = "$i de ${total}: $log"
+        Write-Progress -Activity "Limpando logs de eventos" -Status $status -PercentComplete $pct
         wevtutil cl "$log" 2>$null
     }
     Write-Progress -Activity "Limpando logs de eventos" -Completed
@@ -168,7 +170,7 @@ Start-Sleep -Milliseconds 500
 
 #region ---------- FINALIZACAO ----------
 
-Write-Host "`n"
+Write-Host ""
 Write-FadeText -Text "[OK] Limpeza concluida com sucesso!" -Delay 40 -StartColor DarkGreen -EndColor Green
 Write-Host "Pressione qualquer tecla para sair..." -ForegroundColor DarkGray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
